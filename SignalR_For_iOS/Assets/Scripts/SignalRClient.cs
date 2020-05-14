@@ -25,19 +25,21 @@ public class SignalRClient : MonoBehaviour
     {
         var www = UnityWebRequest.Get("https://localhost:5003/api/editor/login?username=" + username);
         yield return www.SendWebRequest();
-        var cookie = www.GetResponseHeader("set-cookie");
+        var cookie = www.GetResponseHeader("Set-Cookie");
         Debug.Log(cookie);
 
         connection = new HubConnectionBuilder()
+            .WithAutomaticReconnect()
             .WithUrl("https://localhost:5003/game_session", options =>
             {
-                //options.Cookies = new System.Net.CookieContainer(cookie.Length);
-                options.Cookies.SetCookies(new System.Uri("https://localhost:5003/"), cookie);
+                //options.Cookies.SetCookies(new System.Uri("https://localhost:5003/"), cookie);
 
-                foreach (var _cookie in options.Cookies.GetCookies(new System.Uri("https://localhost:5003/")))
-                {
-                    Debug.Log(_cookie);
-                }
+                options.Headers.Add("Cookie", cookie);
+
+                //foreach (var _cookie in options.Cookies.GetCookies(new System.Uri("https://localhost:5003/")))
+                //{
+                //    Debug.Log(_cookie);
+                //}
             })
             .Build();
 
@@ -53,9 +55,17 @@ public class SignalRClient : MonoBehaviour
             await connection.StartAsync();
         };
 
-        connection.On(gameSessionId, (GameMessage payload) =>
+        connection.On(gameSessionId, (object message) =>
         {
-            Debug.Log($"received function: {payload.FunctionName}, message: {payload.Payload}");
+            Debug.Log($"received message: {message}");
+            /*
+            {
+                "functionName":"InitBattleData",
+                "payload":{"version":1,"battleType":"basic_multi","imageKey":"subway","round":1,"currentTeamId":0,"currentCombatantId":"player:5","combatants":["player:5"],"state":1}
+            }
+            */
+            GameMessage<object> payload = JsonUtility.FromJson<GameMessage<object>>(message.ToString());
+            Debug.Log($"received function: {payload.functionName}, payload: {payload.payload}");
         });
 
         Debug.Log("Connection listening");
@@ -86,10 +96,10 @@ public class SignalRClient : MonoBehaviour
 }
 
 [System.Serializable]
-public class GameMessage
+public class GameMessage<TPayload>
 {
     [SerializeField]
-    public string FunctionName { get; private set; }
+    public string functionName;
     [SerializeField]
-    public string Payload { get; private set; }
+    public TPayload payload;
 }
